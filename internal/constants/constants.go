@@ -39,3 +39,5 @@ var ERC_TYPE = []int{
 const MAX_QUANTITY = 100
 
 const MARKET_FEE_PERCENTAGE = 425
+
+const MAX_GO_NUM = 20

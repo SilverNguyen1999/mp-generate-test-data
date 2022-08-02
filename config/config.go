@@ -21,7 +21,7 @@ postgres:
   sslmode: ~
   timeout: 15
   username: axie
-  max_connections: 30
+  max_connections: 60
   idle_connections: 10
   max_time_live: 60
 `)

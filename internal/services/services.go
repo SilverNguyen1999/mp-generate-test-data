@@ -9,6 +9,7 @@ import (
 	"mp-generate-test-data/internal/models"
 	"mp-generate-test-data/internal/stores"
 	"mp-generate-test-data/internal/utils"
+	"sync"
 	"time"
 )
 
@@ -38,14 +39,29 @@ func New(
 	return s
 }
 
-// func (s *Service) enableCors(w *http.ResponseWriter) {
-// 	(*w).Header().Set("Access-Control-Allow-Headers", "*")
-// 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
-// 	(*w).Header().Set("Access-Control-Allow-Methods", "*")
-// }
-
 func (s *Service) Run() {
 	s.gen_test_data()
+}
+
+func (s *Service) genOrdersWithMaxGoRoutines(fromOrderId int64) {
+	var wga sync.WaitGroup
+	for i := 0; i < constants.MAX_GO_NUM; i++ {
+		no := i
+		wga.Add(1)
+		go func() {
+			defer wga.Done()
+
+			err := s.gen_orders(fromOrderId + int64(constants.BATCH_SIZE*no))
+			if err != nil {
+				fmt.Printf("error here %s\n", err.Error())
+				return
+			}
+
+			// fmt.Printf("@@@Done order id: %d\n", fromOrderId+int64(constants.BATCH_SIZE*no))
+		}()
+	}
+
+	wga.Wait()
 }
 
 func (s *Service) gen_test_data() {
@@ -62,12 +78,8 @@ func (s *Service) gen_test_data() {
 	}
 
 	for i := 0; i < constants.BATCH_NUM; i++ {
-		err := s.gen_orders(fromOrderId + int64(constants.BATCH_SIZE*i))
-		if err != nil {
-			return
-		} else {
-			fmt.Printf("Done order id: %d\n", fromOrderId+int64(constants.BATCH_SIZE*i))
-		}
+		s.genOrdersWithMaxGoRoutines(fromOrderId + int64(constants.BATCH_SIZE*constants.MAX_GO_NUM*i))
+		fmt.Printf("Done order id: %d\n", fromOrderId+int64(constants.BATCH_SIZE*constants.MAX_GO_NUM*i))
 	}
 
 }
@@ -156,19 +168,42 @@ func (s *Service) gen_orders(fromOrderId int64) error {
 		return err
 	}
 
+	///////////////
+	errChan := make(chan error)
+	wgDone := make(chan bool)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
 	// insert orderAssets
-	err = s.orderAssetsStore.InsertMany(orderAssets)
-	if err != nil {
-		fmt.Printf("error while inserting orderAssets: %s", err.Error())
-		return err
-	}
+	go func() {
+		err := s.orderAssetsStore.InsertMany(orderAssets)
+		if err != nil {
+			fmt.Printf("error while inserting orderAssets: %s", err.Error())
+			errChan <- err
+		}
+
+		wg.Done()
+	}()
 
 	// insert matchedOrders
-	err = s.matchedOrdersStore.InsertMany(matchedOrders)
-	if err != nil {
-		fmt.Printf("error while inserting matchedOrders: %s", err.Error())
-		return err
-	}
+	go func() {
+		err := s.matchedOrdersStore.InsertMany(matchedOrders)
+		if err != nil {
+			fmt.Printf("error while inserting matchedOrders: %s", err.Error())
+			errChan <- err
+		}
+		wg.Done()
+	}()
 
-	return nil
+	go func() {
+		wg.Wait()
+		close(wgDone)
+	}()
+
+	select {
+	case <-wgDone:
+		return nil
+	case haveErr := <-errChan:
+		return haveErr
+	}
 }
