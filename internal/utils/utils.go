@@ -38,7 +38,7 @@ func RandVerifiedContract() string {
 
 // +1 => exclude 0
 func RandNumberOfAssets() int {
-	return rand.Intn(constants.MAX_NUM_ASSETS) + 1
+	return rand.Intn(constants.MAX_NUM_ASSETS-1) + 1
 }
 
 func RandErcType() int {
@@ -54,7 +54,7 @@ func RandWithMinMax(min, max float64) float64 {
 }
 
 func RandPrice() float64 {
-	return RandWithMinMax(1, 6)
+	return RandWithMinMax(1, 9)
 }
 
 // I want 9/10 order in orders was matched

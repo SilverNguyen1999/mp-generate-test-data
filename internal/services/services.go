@@ -56,7 +56,7 @@ func (s *Service) gen_test_data() {
 		return
 	}
 
-	fromOrderId := int64(0)
+	fromOrderId := int64(1)
 	if exist {
 		fromOrderId = order.Id + 1
 	}
@@ -89,23 +89,25 @@ func (s *Service) gen_orders(fromOrderId int64) error {
 
 		// gen order assets
 		for j := 0; j < numOfAssets; j++ {
-			assetsJsonB = append(assetsJsonB, &models.Assets{
+			assetsJsonB[j] = &models.Assets{
 				Address:  utils.RandVerifiedContract(),
 				Erc:      int8(utils.RandErcType()),
 				Id:       rand.Int63(),
 				Quantity: utils.RandQuantity(),
-			})
+			}
 		}
 
 		for k := 0; k < numOfAssets; k++ {
-			oaOfThisOrder = append(oaOfThisOrder, &models.OrderAssetsMd{
+			asset := &models.OrderAssetsMd{
 				OrderId:  orderId,
 				Address:  assetsJsonB[k].Address,
 				Erc:      assetsJsonB[k].Erc,
 				Id:       assetsJsonB[k].Id,
 				Quantity: int64(assetsJsonB[k].Quantity),
-			})
+			}
+			oaOfThisOrder[k] = asset
 		}
+		orderAssets = append(orderAssets, oaOfThisOrder...)
 		assetsJsonStr, _ := json.Marshal(assetsJsonB)
 
 		startedAt := time.Now().UTC().Unix()
@@ -133,6 +135,7 @@ func (s *Service) gen_orders(fromOrderId int64) error {
 			Signature:           utils.RandStringRunes(42),
 			Hash:                utils.RandStringRunes(50),
 		}
+		orders[i] = orderInfo
 
 		// if have order matched => create record on matched_orders
 		if haveMatchedOrder {
@@ -169,5 +172,3 @@ func (s *Service) gen_orders(fromOrderId int64) error {
 
 	return nil
 }
-
-func (s *Service) gen_order_assets()

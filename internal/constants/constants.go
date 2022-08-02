@@ -14,9 +14,9 @@ var TOKEN_PAYMENT = []string{
 	"0x04ef1d4f687bb20eedcf05c7f710c078ba39f328",  // USD Coin Contract
 }
 
-// total orders record => BATCH_SIZE * BATCH_NUM
-const BATCH_SIZE = 10
-const BATCH_NUM = 3
+// total orders record => BATCH_SIZE * BATCH_NUM =
+const BATCH_SIZE = 100
+const BATCH_NUM = 500000
 
 // len address of matcher
 const ADDRESS_LEN = 40
@@ -33,7 +33,7 @@ const MAX_NUM_ASSETS = 4
 // 1: Erc721
 // 2: Erc1155
 var ERC_TYPE = []int{
-	0, 1, 2,
+	0, 1, 2, 3,
 }
 
 const MAX_QUANTITY = 100

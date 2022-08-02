@@ -28,7 +28,7 @@ func mustConnectPostgres(cfg *config.Config) *gorm.DB {
 		logger.Config{
 			SlowThreshold: time.Second, // Slow SQL threshold
 			Colorful:      true,        // Disable color
-			LogLevel:      logger.Info,
+			LogLevel:      logger.Silent,
 		},
 	)
 
