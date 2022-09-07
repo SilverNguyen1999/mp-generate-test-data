@@ -1,14 +1,18 @@
 package services
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"math/rand"
 	"mp-generate-test-data/config"
 	"mp-generate-test-data/internal/constants"
 	"mp-generate-test-data/internal/models"
 	"mp-generate-test-data/internal/stores"
 	"mp-generate-test-data/internal/utils"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -40,7 +44,8 @@ func New(
 }
 
 func (s *Service) Run() {
-	s.gen_test_data()
+	// s.gen_test_data()
+	sendLargeRequest()
 }
 
 func (s *Service) genOrdersWithMaxGoRoutines(fromOrderId int64) {
@@ -78,8 +83,11 @@ func (s *Service) gen_test_data() {
 	}
 
 	for i := 0; i < constants.BATCH_NUM; i++ {
+		t1 := time.Now().Unix()
 		s.genOrdersWithMaxGoRoutines(fromOrderId + int64(constants.BATCH_SIZE*constants.MAX_GO_NUM*i))
 		fmt.Printf("Done order id: %d\n", fromOrderId+int64(constants.BATCH_SIZE*constants.MAX_GO_NUM*i))
+		t2 := time.Now().Unix()
+		fmt.Printf("about: %d\n", t2-t1)
 	}
 
 }
@@ -206,4 +214,88 @@ func (s *Service) gen_orders(fromOrderId int64) error {
 	case haveErr := <-errChan:
 		return haveErr
 	}
+}
+
+func sendLargeRequest() {
+	AsyncHTTP()
+}
+
+func sendAxieDetailRequest(axieId int64, ch chan<- string, wg *sync.WaitGroup) {
+	defer wg.Done()
+	url := "https://testnet-graphql.skymavis.one/graphql"
+	// fmt.Println("URL:>", url)
+
+	r := fmt.Sprintf(`{"operationName":"GetAxieDetail","variables":{"axieId":"%d"},"query":"query GetAxieDetail($axieId: ID!) {\n  axie(axieId: $axieId) {\n    ...AxieDetail\n    __typename\n  }\n}\n\nfragment AxieDetail on Axie {\n  id\n  image\n  class\n  chain\n  name\n  genes\n  newGenes\n  owner\n  birthDate\n  bodyShape\n  class\n  sireId\n  sireClass\n  matronId\n  matronClass\n  stage\n  title\n  breedCount\n  level\n  figure {\n    atlas\n    model\n    image\n    __typename\n  }\n  parts {\n    ...AxiePart\n    __typename\n  }\n  stats {\n    ...AxieStats\n    __typename\n  }\n  order {\n    ...OrderInfo\n    __typename\n  }\n  ownerProfile {\n    name\n    __typename\n  }\n  battleInfo {\n    ...AxieBattleInfo\n    __typename\n  }\n  children {\n    id\n    name\n    class\n    image\n    title\n    stage\n    __typename\n  }\n  potentialPoints {\n    beast\n    aquatic\n    plant\n    bug\n    bird\n    reptile\n    mech\n    dawn\n    dusk\n    __typename\n  }\n  __typename\n}\n\nfragment AxieBattleInfo on AxieBattleInfo {\n  banned\n  banUntil\n  level\n  __typename\n}\n\nfragment AxiePart on AxiePart {\n  id\n  name\n  class\n  type\n  specialGenes\n  stage\n  abilities {\n    ...AxieCardAbility\n    __typename\n  }\n  __typename\n}\n\nfragment AxieCardAbility on AxieCardAbility {\n  id\n  name\n  attack\n  defense\n  energy\n  description\n  backgroundUrl\n  effectIconUrl\n  __typename\n}\n\nfragment AxieStats on AxieStats {\n  hp\n  speed\n  skill\n  morale\n  __typename\n}\n\nfragment OrderInfo on Order {\n  id\n  maker\n  kind\n  assets {\n    ...AssetInfo\n    __typename\n  }\n  expiredAt\n  paymentToken\n  startedAt\n  basePrice\n  endedAt\n  endedPrice\n  expectedState\n  nonce\n  marketFeePercentage\n  signature\n  hash\n  duration\n  timeLeft\n  currentPrice\n  suggestedPrice\n  currentPriceUsd\n  __typename\n}\n\nfragment AssetInfo on Asset {\n  erc\n  address\n  id\n  quantity\n  __typename\n}\n"}`, axieId)
+
+	var jsonStr = []byte(r)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("authority", "testnet-graphql.skymavis.one")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("error: ", err)
+	}
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+
+	if err != nil {
+		log.Println("err handle it", err)
+	}
+	fmt.Println("response Body:", string(b))
+	ch <- string(b)
+}
+
+func sendTransferRequest(axieId int64, ch chan<- string, wg *sync.WaitGroup) {
+	defer wg.Done()
+	url := "https://testnet-graphql.skymavis.one/graphql"
+	// url := "http://localhost:4201"
+	// fmt.Println("URL:>", url)
+
+	r := fmt.Sprintf(`{"operationName":"GetAxieTransferHistory","variables":{"axieId":"%d","from":0,"size":5},"query":"query GetAxieTransferHistory($axieId: ID!, $from: Int!, $size: Int!) {\n  axie(axieId: $axieId) {\n    id\n    transferHistory(from: $from, size: $size) {\n      ...TransferRecords\n      __typename\n    }\n    ethereumTransferHistory(from: $from, size: $size) {\n      ...TransferRecords\n      __typename\n    }\n    __typename\n  }\n}\n\nfragment TransferRecords on TransferRecords {\n  total\n  results {\n    from\n    to\n    timestamp\n    txHash\n    withPrice\n    __typename\n  }\n  __typename\n}\n"}`, axieId)
+	// var jsonStr = []byte(`{"operationName":"GetAxieTransferHistory","variables":{"axieId":"58702","from":0,"size":5},"query":"query GetAxieTransferHistory($axieId: ID!, $from: Int!, $size: Int!) {\n  axie(axieId: $axieId) {\n    id\n    transferHistory(from: $from, size: $size) {\n      ...TransferRecords\n      __typename\n    }\n    ethereumTransferHistory(from: $from, size: $size) {\n      ...TransferRecords\n      __typename\n    }\n    __typename\n  }\n}\n\nfragment TransferRecords on TransferRecords {\n  total\n  results {\n    from\n    to\n    timestamp\n    txHash\n    withPrice\n    __typename\n  }\n  __typename\n}\n"}`)
+	var jsonStr = []byte(r)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("authority", "testnet-graphql.skymavis.one")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("error: ", err)
+	}
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+
+	if err != nil {
+		log.Println("err handle it")
+	}
+	fmt.Println("response Body:", string(b))
+	ch <- string(b)
+}
+
+func AsyncHTTP() ([]string, error) {
+	ch := make(chan string)
+	var responses []string
+	var wg sync.WaitGroup
+
+	for i := 0; i < 1000; i++ {
+		wg.Add(1)
+		go sendTransferRequest(int64(1136), ch, &wg)
+		// go sendAxieDetailRequest(int64(886), ch, &wg)
+	}
+
+	time.Sleep(2 * time.Second)
+	// close the channel in the background
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+	// read from channel as they come in until its closed
+	for res := range ch {
+		responses = append(responses, res)
+	}
+
+	return responses, nil
 }
